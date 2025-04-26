@@ -14,6 +14,8 @@ import SwiftUI
      
      public var image: UIImage?
      
+     public init() {}
+     
      public func getImage(url: URL?) {
          guard let url,
                let cacheURL = imageDownloader.createHeicCacheURL(for: url) else { return }
