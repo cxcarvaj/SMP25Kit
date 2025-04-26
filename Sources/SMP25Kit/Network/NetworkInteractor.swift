@@ -9,10 +9,12 @@ import Foundation
 
 public protocol NetworkInteractor {
     var session: URLSession { get }
+    var decoder: JSONDecoder { get }
 }
 
 extension NetworkInteractor {
     public var session: URLSession { .shared }
+    public var decoder: JSONDecoder { JSONDecoder() }
 
     public func getJSON<JSON>(_ request: URLRequest,
                        type: JSON.Type,
@@ -20,7 +22,7 @@ extension NetworkInteractor {
         let (data, response) = try await session.getData(for: request)
         if response.statusCode == status {
             do {
-                return try JSONDecoder().decode(JSON.self, from: data)
+                return try decoder.decode(JSON.self, from: data)
             } catch {
                 throw .json(error)
             }
