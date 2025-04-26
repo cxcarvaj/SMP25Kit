@@ -12,6 +12,8 @@ public protocol NetworkInteractor {
 }
 
 extension NetworkInteractor {
+    public var session: URLSession { .shared }
+
     public func getJSON<JSON>(_ request: URLRequest,
                        type: JSON.Type,
                        status: Int = 200) async throws(NetworkError) -> JSON where JSON: Codable {
