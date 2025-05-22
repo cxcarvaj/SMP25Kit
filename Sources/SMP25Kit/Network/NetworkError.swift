@@ -12,6 +12,7 @@ public enum NetworkError: LocalizedError {
     case status(Int)
     case json(Error)
     case dataNotValid
+    case security(String)
     case nonHTTP
     
     public var errorDescription: String? {
@@ -24,6 +25,8 @@ public enum NetworkError: LocalizedError {
             "JSON error: \(error)"
         case .dataNotValid:
             "Invalid data received from server"
+        case .security(let string):
+            "Server certificate validation failed: \(string)"
         case .nonHTTP:
             "URLSession did not return an HTTPURLResponse"
         }
