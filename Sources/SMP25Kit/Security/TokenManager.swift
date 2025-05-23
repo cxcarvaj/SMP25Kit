@@ -8,62 +8,155 @@
 
 import Foundation
 
-/// Gestiona el almacenamiento seguro y acceso a tokens de autenticación usando Keychain
-public struct TokenManager: Sendable {
-    private enum TokenType: String {
-        case bearer = "bearer"
-        case basic = "basic"
-        // Añadir otros tipos según sea necesario
-    }
-    
-    private let tokenKey = "auth.api.token"
-    private let tokenTypeKey = "auth.api.token.type"
+/// Gestor de credenciales para diferentes métodos de autenticación
+public struct AuthCredentialManager: Sendable {
+    private let keyStore = SecKeyStore.shared
     
     public init() {}
     
-    private let keyStore = SecKeyStore.shared
-    
-    /// Guarda un token con su tipo en el llavero
-    /// - Parameters:
-    ///   - token: El token a guardar
-    ///   - type: El tipo de token (por defecto "bearer")
-    public func saveToken(_ token: String, type: String = "bearer") {
-        if let tokenData = token.data(using: .utf8) {
-            keyStore.storeValue(tokenData, withLabel: tokenKey)
+    /// Obtiene el header completo para un método de autenticación
+    /// - Parameter method: Método de autenticación a utilizar
+    /// - Returns: Tupla con (headerName, headerValue) o nil si no hay credenciales disponibles
+    public func getAuthHeader(for method: AuthMethod) -> (name: String, value: String)? {
+        switch method {
+        case .none:
+            return nil
+            
+        case .bearer(let tokenType):
+            // Determinar qué token usar (explícito o buscar automáticamente)
+            let tokenId = tokenType ?? .tokenID
+            
+            // Intentar JWT si no se especificó un tipo concreto
+            if tokenType == nil && tokenId == .tokenID {
+                if let jwtToken = getToken(for: .tokedJWT) {
+                    return ("Authorization", "Bearer \(jwtToken)")
+                }
+            }
+            
+            // Obtener el token del tipo solicitado
+            if let token = getToken(for: tokenId) {
+                return ("Authorization", "Bearer \(token)")
+            }
+            
+        case .basic(let username, let password):
+            // Si se proporcionan username/password explícitos, usarlos
+            if let username = username, let password = password {
+                let credentials = "\(username):\(password)"
+                let base64Credentials = Data(credentials.utf8).base64EncodedString()
+                return ("Authorization", "Basic \(base64Credentials)")
+            }
+            
+            // Si no, buscar en el keystore
+            if let credentialsData = keyStore.readValue(withLabel: GlobalIDs.basicAuth.rawValue),
+               let credentials = String(data: credentialsData, encoding: .utf8) {
+                let parts = credentials.split(separator: ":").map(String.init)
+                if parts.count == 2 {
+                    let base64Credentials = Data("\(parts[0]):\(parts[1])".utf8).base64EncodedString()
+                    return ("Authorization", "Basic \(base64Credentials)")
+                }
+            }
+            
+        case .apiKey(let key, let headerName):
+            // Si se proporciona una key explícita, usarla
+            if let key = key {
+                return (headerName, key)
+            }
+            
+            // Si no, buscar en el keystore
+            if let keyData = keyStore.readValue(withLabel: GlobalIDs.apiKey.rawValue),
+               let apiKey = String(data: keyData, encoding: .utf8) {
+                return (headerName, apiKey)
+            }
+            
+        case .digest(let username, let password):
+            // Implementación básica de Digest Auth
+            // En una aplicación real, necesitarías manejar nonce, etc.
+            if let username = username, let password = password {
+                // Digest Auth necesitaría una implementación más compleja con challenge response
+                // Esto es un placeholder simplificado
+                return ("Authorization", "Digest username=\"\(username)\", realm=\"example\"")
+            }
+            
+            // Buscar en keystore (simplificado)
+            if let digestData = keyStore.readValue(withLabel: GlobalIDs.digestAuth.rawValue),
+               let digestCreds = String(data: digestData, encoding: .utf8) {
+                return ("Authorization", digestCreds)
+            }
+            
+        case .custom(let headerValue):
+            return ("Authorization", headerValue)
         }
         
-        if let typeData = type.data(using: .utf8) {
-            keyStore.storeValue(typeData, withLabel: tokenTypeKey)
+        return nil
+    }
+    
+    /// Guarda credenciales para un método de autenticación específico
+    /// - Parameters:
+    ///   - method: Método de autenticación
+    ///   - credentials: Credenciales a guardar
+    public func saveCredentials(for method: AuthMethod, credentials: String) {
+        guard let data = credentials.data(using: .utf8) else { return }
+        
+        switch method {
+        case .bearer(let tokenType):
+            let key = tokenType?.rawValue ?? GlobalIDs.tokenID.rawValue
+            keyStore.storeValue(data, withLabel: key)
+            
+        case .basic:
+            keyStore.storeValue(data, withLabel: GlobalIDs.basicAuth.rawValue)
+            
+        case .apiKey:
+            keyStore.storeValue(data, withLabel: GlobalIDs.apiKey.rawValue)
+            
+        case .digest:
+            keyStore.storeValue(data, withLabel: GlobalIDs.digestAuth.rawValue)
+            
+        case .none, .custom:
+            break // No almacenar
         }
     }
     
-    /// Obtiene el token actual con su formato completo (ej: "Bearer xyz123")
-    /// - Returns: Token formateado o nil si no existe
-    public func getFormattedToken() -> String? {
-        guard let tokenData = keyStore.readValue(withLabel: tokenKey),
-              let token = String(data: tokenData, encoding: .utf8),
-              let typeData = keyStore.readValue(withLabel: tokenTypeKey),
-              let typeString = String(data: typeData, encoding: .utf8),
-              let type = TokenType(rawValue: typeString.lowercased()) else {
+    /// Borra credenciales para un método específico
+    /// - Parameter method: Método cuyas credenciales se borrarán
+    public func clearCredentials(for method: AuthMethod) {
+        switch method {
+        case .bearer(let tokenType):
+            if let type = tokenType {
+                keyStore.deleteValue(withLabel: type.rawValue)
+            } else {
+                keyStore.deleteValue(withLabel: GlobalIDs.tokenID.rawValue)
+                keyStore.deleteValue(withLabel: GlobalIDs.tokedJWT.rawValue)
+            }
+            
+        case .basic:
+            keyStore.deleteValue(withLabel: GlobalIDs.basicAuth.rawValue)
+            
+        case .apiKey:
+            keyStore.deleteValue(withLabel: GlobalIDs.apiKey.rawValue)
+            
+        case .digest:
+            keyStore.deleteValue(withLabel: GlobalIDs.digestAuth.rawValue)
+            
+        case .none, .custom:
+            break // No hacer nada
+        }
+    }
+    
+    /// Borra todas las credenciales almacenadas
+    public func clearAllCredentials() {
+        keyStore.deleteValue(withLabel: GlobalIDs.tokenID.rawValue)
+        keyStore.deleteValue(withLabel: GlobalIDs.tokedJWT.rawValue)
+        keyStore.deleteValue(withLabel: GlobalIDs.basicAuth.rawValue)
+        keyStore.deleteValue(withLabel: GlobalIDs.apiKey.rawValue)
+        keyStore.deleteValue(withLabel: GlobalIDs.digestAuth.rawValue)
+    }
+    
+    // Método de ayuda para obtener un token
+    private func getToken(for tokenType: GlobalIDs) -> String? {
+        guard let tokenData = keyStore.readValue(withLabel: tokenType.rawValue),
+              let token = String(data: tokenData, encoding: .utf8) else {
             return nil
         }
-        
-        switch type {
-        case .bearer:
-            return "Bearer \(token)"
-        case .basic:
-            return "Basic \(token)"
-        }
-    }
-    
-    /// Elimina el token actual
-    public func clearToken() {
-        keyStore.deleteValue(withLabel: tokenKey)
-        keyStore.deleteValue(withLabel: tokenTypeKey)
-    }
-    
-    /// Verifica si existe un token guardado
-    public var hasToken: Bool {
-        keyStore.readValue(withLabel: tokenKey) != nil
+        return token
     }
 }

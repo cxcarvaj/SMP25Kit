@@ -19,54 +19,115 @@ public enum HTTPMethod: String {
 public actor AuthMiddlewareManager {
     public static let shared = AuthMiddlewareManager()
     
-    private var middleware = AuthMiddleware()
+    /// Método de autenticación global por defecto
+    private var defaultAuthMethod: AuthMethod = .bearer(tokenType: nil)
     
-    public func configure(middleware: AuthMiddleware) {
-        self.middleware = middleware
+    /// Gestor de credenciales
+    private let credentialManager = AuthCredentialManager()
+    
+    /// Configura el método de autenticación global por defecto
+    /// - Parameter method: Método a usar como predeterminado
+    public func setDefaultAuthMethod(_ method: AuthMethod) {
+        defaultAuthMethod = method
     }
     
-    public func authenticate(_ request: URLRequest) -> URLRequest {
-        return middleware.authenticate(request)
+    /// Aplica autenticación a una solicitud
+    /// - Parameters:
+    ///   - request: Solicitud original
+    ///   - method: Método específico a usar (o nil para usar el predeterminado)
+    /// - Returns: Solicitud con autenticación
+    public func authenticate(_ request: URLRequest, using method: AuthMethod? = nil) -> URLRequest {
+        var authenticatedRequest = request
+        let authMethod = method ?? defaultAuthMethod
+        
+        // Si ya tiene un header de autorización y el método lo usaría, respetarlo
+        if authMethod.usesAuthorizationHeader && authenticatedRequest.value(forHTTPHeaderField: "Authorization") != nil {
+            return authenticatedRequest
+        }
+        
+        // Obtener y aplicar el header de autenticación
+        if let (headerName, headerValue) = credentialManager.getAuthHeader(for: authMethod) {
+            authenticatedRequest.setValue(headerValue, forHTTPHeaderField: headerName)
+        }
+        
+        return authenticatedRequest
+    }
+    
+    /// Guarda credenciales para un método específico
+    /// - Parameters:
+    ///   - method: Método de autenticación
+    ///   - credentials: Valor de las credenciales
+    public func saveCredentials(for method: AuthMethod, credentials: String) {
+        credentialManager.saveCredentials(for: method, credentials: credentials)
+    }
+    
+    /// Guarda credenciales para autenticación básica
+    /// - Parameters:
+    ///   - username: Nombre de usuario
+    ///   - password: Contraseña
+    public func saveBasicAuth(username: String, password: String) {
+        credentialManager.saveCredentials(for: .basic(username: nil, password: nil),
+                                       credentials: "\(username):\(password)")
+    }
+    
+    /// Guarda un token Bearer
+    /// - Parameters:
+    ///   - token: Token a guardar
+    ///   - tokenType: Tipo de token (JWT o normal)
+    public func saveToken(_ token: String, tokenType: GlobalIDs = .tokenID) {
+        credentialManager.saveCredentials(for: .bearer(tokenType: tokenType), credentials: token)
+    }
+    
+    /// Guarda una API Key
+    /// - Parameter apiKey: API Key a guardar
+    public func saveApiKey(_ apiKey: String) {
+        credentialManager.saveCredentials(for: .apiKey(key: nil, headerName: "X-API-Key"),
+                                       credentials: apiKey)
+    }
+    
+    /// Borra todas las credenciales
+    public func clearAllCredentials() {
+        credentialManager.clearAllCredentials()
     }
 }
 
 /// An extension of `URLRequest` to simplify the creation of HTTP requests with common configurations and with support for automatic authentication
 extension URLRequest {
     
-    /// Configura el middleware de autenticación global
-    /// - Parameter middleware: El middleware a utilizar
-    static func configureAuth(middleware: AuthMiddleware) async {
-        await AuthMiddlewareManager.shared.configure(middleware: middleware)
+    /// Configura el método de autenticación global predeterminado
+    /// - Parameter method: Método a usar como predeterminado
+    static func setDefaultAuthMethod(_ method: AuthMethod) async {
+        await AuthMiddlewareManager.shared.setDefaultAuthMethod(method)
     }
     
     /// Creates a GET request for the specified URL with optional authorized headers.
     /// - Parameters:
     ///   - url: The `URL` for the request.
-    ///   - skipAuth: Whether to bypass automatic authentication
+    ///   - authMethod: Método específico de autenticación (o nil para usar el predeterminado)
     ///   - authorizedHeader: A dictionary containing authorization headers. Defaults to an empty dictionary.
     /// - Returns: A configured `URLRequest` for a GET operation.
     public static func get(
         _ url: URL,
-        skipAuth: Bool = false,
+        authMethod: AuthMethod? = nil,
         authorizedHeader: [String: String] = [:]
     ) async -> URLRequest {
         let request = buildRequest(from: .get, with: url, and: authorizedHeader)
-        return skipAuth ? request : await AuthMiddlewareManager.shared.authenticate(request)
+        return authorizedHeader["Authorization"] != nil ? request : await AuthMiddlewareManager.shared.authenticate(request, using: authMethod)
     }
     
     /// Creates a DELETE request for the specified URL with optional authorized headers.
     /// - Parameters:
     ///   - url: The `URL` for the request.
-    ///   - skipAuth: Whether to bypass automatic authentication
+    ///   - authMethod: Método específico de autenticación (o nil para usar el predeterminado)
     ///   - authorizedHeader: A dictionary containing authorization headers. Defaults to an empty dictionary.
     /// - Returns: A configured `URLRequest` for a DELETE operation.
     public static func delete(
         _ url: URL,
-        skipAuth: Bool = false,
+        authMethod: AuthMethod? = nil,
         authorizedHeader: [String: String] = [:]
     ) async -> URLRequest {
         let request = buildRequest(from: .get, with: url, and: authorizedHeader)
-        return skipAuth ? request : await AuthMiddlewareManager.shared.authenticate(request)
+        return authorizedHeader["Authorization"] != nil ? request : await AuthMiddlewareManager.shared.authenticate(request, using: authMethod)
     }
     
     /// Creates a POST or custom HTTP request with a JSON-encoded body.
@@ -74,7 +135,7 @@ extension URLRequest {
     ///   - url: The `URL` for the request.
     ///   - body: The JSON-encodable body to include in the request.
     ///   - method: The HTTP method to use. Defaults to `.post`.
-    ///   - skipAuth: Whether to bypass automatic authentication
+    ///   - authMethod: Método específico de autenticación (o nil para usar el predeterminado)
     ///   - authorizedHeader: A dictionary containing authorization headers. Defaults to an empty dictionary.
     /// - Returns: A configured `URLRequest` for the specified HTTP method with a JSON-encoded body.
     /// - Note: Sets the "Content-Type" header to `application/json; charset=utf-8`.
@@ -82,13 +143,13 @@ extension URLRequest {
         url: URL,
         body: JSON,
         method: HTTPMethod = .post,
-        skipAuth: Bool = false,
+        authMethod: AuthMethod? = nil,
         authorizedHeader: [String: String] = [:]
     ) async -> URLRequest where JSON: Encodable {
         var request: URLRequest = .buildRequest(from: method, with: url, and: authorizedHeader)
         request.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONEncoder().encode(body)
-        return skipAuth ? request : await AuthMiddlewareManager.shared.authenticate(request)
+        return authorizedHeader["Authorization"] != nil ? request : await AuthMiddlewareManager.shared.authenticate(request, using: authMethod)
     }
     
     /// A private helper method to build a general HTTP request with the specified method, URL, and headers.
