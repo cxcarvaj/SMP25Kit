@@ -96,7 +96,7 @@ extension URLRequest {
     
     /// Configura el método de autenticación global predeterminado
     /// - Parameter method: Método a usar como predeterminado
-    static func setDefaultAuthMethod(_ method: AuthMethod) async {
+    public static func setDefaultAuthMethod(_ method: AuthMethod) async {
         await AuthMiddlewareManager.shared.setDefaultAuthMethod(method)
     }
     
