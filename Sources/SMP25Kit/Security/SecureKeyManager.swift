@@ -8,7 +8,7 @@
 import Foundation
 import CryptoKit
 
-final class SecureKeyManager: Sendable {
+public final class SecureKeyManager: Sendable {
     static let shared = SecureKeyManager()  // Singleton de la clase
     static private let keyLabel = "SecureEncryptionKey"  // Etiqueta descriptiva para la clave en el almacenamiento seguro
     static private let randomNumberLabel = "SecureRandomNumber"  // Etiqueta descriptiva para el número aleatorio

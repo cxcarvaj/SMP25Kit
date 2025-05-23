@@ -12,7 +12,7 @@ import os.log
 
 //extension SecAccessControl: @retroactive @unchecked Sendable {}
 
-struct SecKeyStore {
+public struct SecKeyStore: Sendable {
     private static let accessControl: SecAccessControl = {
         guard let accessControl = SecAccessControlCreateWithFlags(nil,
                                                        kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly,
@@ -25,9 +25,9 @@ struct SecKeyStore {
     
     private static let log = OSLog(subsystem: Bundle.main.bundleIdentifier ?? "", category: "SecKeyStore")
 
-    static let shared = SecKeyStore()
+    public static let shared = SecKeyStore()
     
-    func storeValue(_ data: Data, withLabel label: String) {
+    public func storeValue(_ data: Data, withLabel label: String) {
         let query = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrAccount: label,
@@ -57,7 +57,7 @@ struct SecKeyStore {
         }
     }
     
-    func readValue(withLabel label: String) -> Data? {
+    public func readValue(withLabel label: String) -> Data? {
         let query = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrAccount: label,
@@ -93,7 +93,7 @@ struct SecKeyStore {
         }
     }
     
-    func storePrivateKey(_ certificate: Data, tag: String) {
+    public func storePrivateKey(_ certificate: Data, tag: String) {
         let tagData = Data(tag.utf8)
         let query = [
             kSecClass: kSecClassKey,
@@ -114,7 +114,7 @@ struct SecKeyStore {
         }
     }
     
-    func readPrivateKey(tag: String) -> Data? {
+    public func readPrivateKey(tag: String) -> Data? {
         let tagData = Data(tag.utf8)
         let query = [
             kSecClass: kSecClassKey,
