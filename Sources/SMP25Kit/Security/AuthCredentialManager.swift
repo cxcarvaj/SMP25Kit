@@ -37,6 +37,9 @@ public struct AuthCredentialManager: Sendable {
             if let token = getToken(for: tokenId) {
                 return ("Authorization", "Bearer \(token)")
             }
+        
+        case .bearerToken(token: let token):
+            return ("Authorization", "Bearer \(token)")
             
         case .basic(let username, let password):
             // Si se proporcionan username/password explícitos, usarlos
@@ -101,6 +104,10 @@ public struct AuthCredentialManager: Sendable {
         case .bearer(let tokenType):
             let key = tokenType?.rawValue ?? GlobalIDs.tokenID.rawValue
             keyStore.storeValue(data, withLabel: key)
+        
+        case .bearerToken(let token):
+            guard let data = token.data(using: .utf8) else { return }
+            keyStore.storeValue(data, withLabel: GlobalIDs.appleSIWA.rawValue)
             
         case .basic:
             keyStore.storeValue(data, withLabel: GlobalIDs.basicAuth.rawValue)
@@ -127,6 +134,8 @@ public struct AuthCredentialManager: Sendable {
                 keyStore.deleteValue(withLabel: GlobalIDs.tokenID.rawValue)
                 keyStore.deleteValue(withLabel: GlobalIDs.tokedJWT.rawValue)
             }
+        case .bearerToken(let token):
+            keyStore.deleteValue(withLabel: GlobalIDs.appleSIWA.rawValue)
             
         case .basic:
             keyStore.deleteValue(withLabel: GlobalIDs.basicAuth.rawValue)
@@ -153,16 +162,16 @@ public struct AuthCredentialManager: Sendable {
         jwt: String,
         issuer: String,
         key: Data
-    ) throws -> Bool {
+    ) throws(NetworkError) -> Bool {
         // 1. Validar el JWT
         let validator = ValidateJWT()
         let valid = try validator.JWTValidation(jwt: jwt, issuer: issuer, key: key)
         guard valid else {
-            throw NetworkError.security("JWT inválido o expirado")
+            throw .security("JWT inválido o expirado")
         }
         // 2. Almacenar en Keychain
         guard let data = jwt.data(using: .utf8) else {
-            throw NetworkError.security("No se pudo convertir el JWT a datos")
+            throw .security("No se pudo convertir el JWT a datos")
         }
         keyStore.storeValue(data, withLabel: GlobalIDs.tokedJWT.rawValue)
         return true
@@ -175,6 +184,7 @@ public struct AuthCredentialManager: Sendable {
         keyStore.deleteValue(withLabel: GlobalIDs.basicAuth.rawValue)
         keyStore.deleteValue(withLabel: GlobalIDs.apiKey.rawValue)
         keyStore.deleteValue(withLabel: GlobalIDs.digestAuth.rawValue)
+        keyStore.deleteValue(withLabel: GlobalIDs.appleSIWA.rawValue)
     }
     
     // Método de ayuda para obtener un token
