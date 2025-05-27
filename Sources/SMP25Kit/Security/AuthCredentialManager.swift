@@ -156,12 +156,14 @@ public struct AuthCredentialManager: Sendable {
     ///   - jwt: El token JWT recibido.
     ///   - issuer: El issuer esperado.
     ///   - key: Clave simétrica HS256 con la que validar el JWT.
+    ///   - withLabel: Label para guardar la data en el keyChain
     /// - Throws: NetworkError en caso de error de validación.
     /// - Returns: true si se validó y almacenó correctamente.
     public func validateAndStoreJWT(
         jwt: String,
         issuer: String,
-        key: Data
+        key: Data,
+        withLabel: String = GlobalIDs.tokedJWT.rawValue,
     ) throws(NetworkError) -> Bool {
         // 1. Validar el JWT
         let validator = ValidateJWT()
@@ -173,7 +175,7 @@ public struct AuthCredentialManager: Sendable {
         guard let data = jwt.data(using: .utf8) else {
             throw .security("No se pudo convertir el JWT a datos")
         }
-        keyStore.storeValue(data, withLabel: GlobalIDs.tokedJWT.rawValue)
+        keyStore.storeValue(data, withLabel: withLabel)
         return true
     }
     
