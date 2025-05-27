@@ -16,7 +16,7 @@ public struct SecKeyStore: Sendable {
     private static let accessControl: SecAccessControl = {
         guard let accessControl = SecAccessControlCreateWithFlags(nil,
                                                        kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly,
-                                                       [.privateKeyUsage, .userPresence],
+                                                                  [.privateKeyUsage, .userPresence],
                                                        nil) else {
             fatalError("Error creating access control")
         }
@@ -33,7 +33,7 @@ public struct SecKeyStore: Sendable {
             kSecAttrAccount: label,
             kSecAttrService: Bundle.main.bundleIdentifier ?? "com.cxcarvaj.SecretApp",
 //            kSecAttrAccessible: kSecAttrAccessibleWhenUnlocked, //Deprecado
-            kSecAttrAccessControl: Self.accessControl,
+//            kSecAttrAccessControl: Self.accessControl,
             kSecUseDataProtectionKeychain: true,
             kSecValueData: data
         ] as [String: Any]
@@ -63,7 +63,7 @@ public struct SecKeyStore: Sendable {
             kSecAttrAccount: label,
             kSecAttrService: Bundle.main.bundleIdentifier ?? "com.cxcarvaj.SecretApp",
 //            kSecAttrAccessible: kSecAttrAccessibleWhenUnlocked, //Deprecado
-            kSecAttrAccessControl: Self.accessControl,
+//            kSecAttrAccessControl: Self.accessControl,
             kSecUseDataProtectionKeychain: true,
             kSecReturnData: true,
             kSecMatchLimit: kSecMatchLimitOne,
@@ -99,7 +99,7 @@ public struct SecKeyStore: Sendable {
             kSecClass: kSecClassKey,
             kSecAttrKeyClass: kSecAttrKeyClassPrivate,
             kSecAttrApplicationTag: tagData,
-            kSecAttrAccessControl: Self.accessControl,
+//            kSecAttrAccessControl: Self.accessControl,
             kSecAttrIsPermanent: true,
             kSecValueData: certificate
         ] as [String: Any]
@@ -120,7 +120,7 @@ public struct SecKeyStore: Sendable {
             kSecClass: kSecClassKey,
             kSecAttrKeyClass: kSecAttrKeyClassPrivate,
             kSecAttrApplicationTag: tagData,
-            kSecAttrAccessControl: Self.accessControl,
+//            kSecAttrAccessControl: Self.accessControl,
             kSecReturnData: true,
             kSecMatchLimit: kSecMatchLimitOne
         ] as [String: Any]
