@@ -1,5 +1,5 @@
 //
-//  TokenManager.swift
+//  AuthCredentialManager.swift
 //  SMP25Kit
 //
 //  Created by Carlos Xavier Carvajal Villegas on 22/5/25.
@@ -140,6 +140,32 @@ public struct AuthCredentialManager: Sendable {
         case .none, .custom:
             break // No hacer nada
         }
+    }
+    
+    /// Valida y almacena un JWT recibido del backend.
+    /// - Parameters:
+    ///   - jwt: El token JWT recibido.
+    ///   - issuer: El issuer esperado.
+    ///   - key: Clave simétrica HS256 con la que validar el JWT.
+    /// - Throws: NetworkError en caso de error de validación.
+    /// - Returns: true si se validó y almacenó correctamente.
+    public func validateAndStoreJWT(
+        jwt: String,
+        issuer: String,
+        key: Data
+    ) throws -> Bool {
+        // 1. Validar el JWT
+        let validator = ValidateJWT()
+        let valid = try validator.JWTValidation(jwt: jwt, issuer: issuer, key: key)
+        guard valid else {
+            throw NetworkError.security("JWT inválido o expirado")
+        }
+        // 2. Almacenar en Keychain
+        guard let data = jwt.data(using: .utf8) else {
+            throw NetworkError.security("No se pudo convertir el JWT a datos")
+        }
+        keyStore.storeValue(data, withLabel: GlobalIDs.tokedJWT.rawValue)
+        return true
     }
     
     /// Borra todas las credenciales almacenadas

@@ -80,7 +80,7 @@ public struct SecKeyStore: Sendable {
         return item as? Data
     }
     
-    func deleteValue(withLabel label: String) {
+    public func deleteValue(withLabel label: String) {
         let query = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrAccount: label,
