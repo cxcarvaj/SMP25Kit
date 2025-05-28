@@ -28,7 +28,7 @@ public struct AuthCredentialManager: Sendable {
             
             // Intentar JWT si no se especificó un tipo concreto
             if tokenType == nil && tokenId == .tokenID {
-                if let jwtToken = getToken(for: .tokedJWT) {
+                if let jwtToken = getToken(for: .tokenJWT) {
                     return ("Authorization", "Bearer \(jwtToken)")
                 }
             }
@@ -38,7 +38,7 @@ public struct AuthCredentialManager: Sendable {
                 return ("Authorization", "Bearer \(token)")
             }
         
-        case .bearerToken(token: let token):
+        case .SIWAToken(token: let token):
             return ("Authorization", "Bearer \(token)")
             
         case .basic(let username, let password):
@@ -105,8 +105,7 @@ public struct AuthCredentialManager: Sendable {
             let key = tokenType?.rawValue ?? GlobalIDs.tokenID.rawValue
             keyStore.storeValue(data, withLabel: key)
         
-        case .bearerToken(let token):
-            guard let data = token.data(using: .utf8) else { return }
+        case .SIWAToken:
             keyStore.storeValue(data, withLabel: GlobalIDs.appleSIWA.rawValue)
             
         case .basic:
@@ -132,9 +131,9 @@ public struct AuthCredentialManager: Sendable {
                 keyStore.deleteValue(withLabel: type.rawValue)
             } else {
                 keyStore.deleteValue(withLabel: GlobalIDs.tokenID.rawValue)
-                keyStore.deleteValue(withLabel: GlobalIDs.tokedJWT.rawValue)
+                keyStore.deleteValue(withLabel: GlobalIDs.tokenJWT.rawValue)
             }
-        case .bearerToken(let token):
+        case .SIWAToken:
             keyStore.deleteValue(withLabel: GlobalIDs.appleSIWA.rawValue)
             
         case .basic:
@@ -156,14 +155,12 @@ public struct AuthCredentialManager: Sendable {
     ///   - jwt: El token JWT recibido.
     ///   - issuer: El issuer esperado.
     ///   - key: Clave simétrica HS256 con la que validar el JWT.
-    ///   - withLabel: Label para guardar la data en el keyChain
     /// - Throws: NetworkError en caso de error de validación.
     /// - Returns: true si se validó y almacenó correctamente.
     public func validateAndStoreJWT(
         jwt: String,
         issuer: String,
         key: Data,
-        withLabel: String = GlobalIDs.tokedJWT.rawValue,
     ) throws(NetworkError) -> Bool {
         // 1. Validar el JWT
         let validator = ValidateJWT()
@@ -175,14 +172,14 @@ public struct AuthCredentialManager: Sendable {
         guard let data = jwt.data(using: .utf8) else {
             throw .security("No se pudo convertir el JWT a datos")
         }
-        keyStore.storeValue(data, withLabel: withLabel)
+        keyStore.storeValue(data, withLabel: GlobalIDs.tokenJWT.rawValue)
         return true
     }
     
     /// Borra todas las credenciales almacenadas
     public func clearAllCredentials() {
         keyStore.deleteValue(withLabel: GlobalIDs.tokenID.rawValue)
-        keyStore.deleteValue(withLabel: GlobalIDs.tokedJWT.rawValue)
+        keyStore.deleteValue(withLabel: GlobalIDs.tokenJWT.rawValue)
         keyStore.deleteValue(withLabel: GlobalIDs.basicAuth.rawValue)
         keyStore.deleteValue(withLabel: GlobalIDs.apiKey.rawValue)
         keyStore.deleteValue(withLabel: GlobalIDs.digestAuth.rawValue)

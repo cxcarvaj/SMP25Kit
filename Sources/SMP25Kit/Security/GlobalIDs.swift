@@ -17,9 +17,9 @@ public enum AuthMethod: Sendable {
     /// - Parameter tokenType: Tipo de token a usar (.tokenID o .tokedJWT)
     case bearer(tokenType: GlobalIDs?)
     
-    /// Autenticación con token Bearer (OAuth 2.0, JWT)
-    /// - Parameter token: Token string a usar
-    case bearerToken(token: String)
+    /// Autenticación con SIWA token Bearer
+    /// - Parameter token: Token string generado por Apple
+    case SIWAToken(token: String)
     
     /// Autenticación Basic con usuario y contraseña
     /// - Parameters:
@@ -45,7 +45,7 @@ public enum AuthMethod: Sendable {
         switch self {
         case .none, .apiKey:
             return false
-        case .bearer, .bearerToken ,.basic, .digest, .custom:
+        case .bearer, .SIWAToken, .basic, .digest, .custom:
             return true
         }
     }
@@ -54,7 +54,7 @@ public enum AuthMethod: Sendable {
 /// Define las claves para almacenar tokens y credenciales
 public enum GlobalIDs: String, Sendable {
     case tokenID = "OAUTH_TOKEN"
-    case tokedJWT = "JWT_TOKEN"
+    case tokenJWT = "JWT_TOKEN"
     case basicAuth = "BASIC_AUTH"
     case digestAuth = "DIGEST_AUTH"
     case apiKey = "API_KEY"
