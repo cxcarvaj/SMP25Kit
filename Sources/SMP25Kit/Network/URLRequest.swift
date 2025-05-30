@@ -134,6 +134,7 @@ extension URLRequest {
     /// - Parameters:
     ///   - url: The `URL` for the request.
     ///   - body: The JSON-encodable body to include in the request.
+    ///   - encoder: The JSONEncoder to convert Swift data (such as structs or classes) to JSON format
     ///   - method: The HTTP method to use. Defaults to `.post`.
     ///   - authMethod: Método específico de autenticación (o nil para usar el predeterminado)
     ///   - authorizedHeader: A dictionary containing authorization headers. Defaults to an empty dictionary.
@@ -142,13 +143,14 @@ extension URLRequest {
     public static func post<JSON>(
         url: URL,
         body: JSON,
+        encoder: JSONEncoder = JSONEncoder(),
         method: HTTPMethod = .post,
         authMethod: AuthMethod? = nil,
         authorizedHeader: [String: String] = [:]
     ) async -> URLRequest where JSON: Encodable {
         var request: URLRequest = .buildRequest(from: method, with: url, and: authorizedHeader)
         request.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONEncoder().encode(body)
+        request.httpBody = try? encoder.encode(body)
         return authorizedHeader["Authorization"] != nil ? request : await AuthMiddlewareManager.shared.authenticate(request, using: authMethod)
     }
     

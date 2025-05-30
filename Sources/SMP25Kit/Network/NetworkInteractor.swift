@@ -10,11 +10,13 @@ import Foundation
 public protocol NetworkInteractor {
     var session: URLSession { get }
     var decoder: JSONDecoder { get }
+    var encoder: JSONEncoder { get }
 }
 
 extension NetworkInteractor {
     public var session: URLSession { .shared }
     public var decoder: JSONDecoder { JSONDecoder() }
+    public var encoder: JSONEncoder { JSONEncoder() }
 
     public func getJSON<JSON>(_ request: URLRequest,
                        type: JSON.Type,

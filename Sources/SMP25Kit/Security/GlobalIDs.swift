@@ -19,7 +19,7 @@ public enum AuthMethod: Sendable {
     
     /// Autenticación con SIWA token Bearer
     /// - Parameter token: Token string generado por Apple
-    case SIWAToken(token: String?)
+    case SIWAToken(token: String)
     
     /// Autenticación Basic con usuario y contraseña
     /// - Parameters:
